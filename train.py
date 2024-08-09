@@ -675,7 +675,7 @@ def main(args):
                 if global_step and global_step % args.checkpointing_steps == 0 and phase == 'D':
                     save_path = os.path.join(ckpt_dir, f'checkpoint-{global_step}')
                     try:
-                        accelerator.save_state(output_dir=save_path)
+                        accelerator.save_state(output_dir=save_path, safe_serialization=False)
                     except Exception as e:
                         logger.info('error saving ckpts')
                         print(e)
@@ -696,9 +696,13 @@ def main(args):
             if global_step >= args.max_train_steps:
                 accelerator.wait_for_everyone()
                 if accelerator.is_main_process:
-                    target_model_path = get_model_subfolder(args.base_model, save_path)
-                    accelerator.unwrap_model(target_model).save_pretrained(target_model_path)
-                    accelerator.unwrap_model(disc).save_pretrained(os.path.join(save_path, 'disc.bin'))
+                    save_path = os.path.join(ckpt_dir, f'checkpoint-{global_step}')
+                    try:
+                        accelerator.save_state(output_dir=save_path, safe_serialization=False)
+                    except Exception as e:
+                        logger.info('error saving ckpts')
+                        print(e)
+                    logger.info(f'Saved state to {save_path}')
                 accelerator.end_training()
                 return
 

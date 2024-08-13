@@ -5,8 +5,8 @@ For SDv2.1-base model, we achieve FLOP reduction of 95.95%, but only at the cost
 
 | Model    | FID &darr; | CLIP &uarr; |FLOPs| Latency on MI250 (sec)
 | :---: | :---: | :---: | :---: | :---:
-| SDv2.1-base 50 steps (cfg=7.5) | 29.94   | 0.3285 |83.04 | 4.94
-| Our distilled model 1 step | 25.68     | 0.3203|3.36 | 0.18
+| SDv2.1-base 50 steps (cfg=7.5) | 25.47   | 0.3286 |83.04 | 4.94
+| Our distilled model 1 step | 26.04     | 0.3204|3.36 | 0.18
 
 ## Environment
 

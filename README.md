@@ -21,7 +21,7 @@ docker pull rocm/pytorch:rocm6.1.3_ubuntu22.04_py3.10_pytorch_release-2.1.2
 install the core python libraries by
 
 ```
-pip install diffusers==0.29.2 transformers accelerate wandb
+pip install diffusers==0.29.2 transformers accelerate wandb torchmetrics pycocotools torchmetrics[image] open-clip-torch
 ```
 
 ## Synthetic data generation

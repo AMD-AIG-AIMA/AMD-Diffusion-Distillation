@@ -1,14 +1,21 @@
+# Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 import argparse, os
 import torch
-import random
-from datetime import datetime
-from random import shuffle
-import numpy as np
-import time
-from diffusers import (UNet2DConditionModel, 
-                       DDPMScheduler,
+from diffusers import (DDPMScheduler,
                        DiffusionPipeline)
 import torch.nn as nn
 
@@ -30,17 +37,15 @@ parser.add_argument("--out_folder",
     required=True
 )
 
-parser.add_argument("--latent_code",
-    type=str,
-    required=True
-)
-
 parser.add_argument("--prompt_path",
     type=str,
     required=True
 )
 
-
+parser.add_argument("--seed",
+    type=int,
+    default=0,
+)
 
 args = parser.parse_args()
 
@@ -67,13 +72,13 @@ with open(args.prompt_path, 'r') as f:
     for l in lines:
         prompt_list.append(l.strip().split('----')[1])
 
-start_code = torch.load(args.latent_code).cuda()
+torch.manual_seed(args.seed)
+print('seed: ', args.seed)
 
 with torch.no_grad():
     num_samples = len(prompt_list)
     for id_ind, cur_caption in enumerate(prompt_list):
         outpath = os.path.join(args.out_folder, '%d.png'%id_ind)
         image = pipe(prompt=cur_caption,
-                        latents=start_code,
                         **pipe_kwargs).images[0]
         image.save(outpath)

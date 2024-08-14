@@ -21,7 +21,6 @@ from PIL import Image
 import numpy as np
 from tqdm import tqdm
 import glob
-import random
 from pycocotools.coco import COCO
 
 parser = argparse.ArgumentParser()

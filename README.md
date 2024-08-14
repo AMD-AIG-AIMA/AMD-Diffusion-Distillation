@@ -75,8 +75,24 @@ image = pipe(prompt='a photo of an astronaut riding a horse on mars',
 ```
 
 ## Evaluation
-TODO
 
+**COCO dataset**
+Download COCO val2017 images from [Here](http://images.cocodataset.org/zips/val2017.zip) and annotation from [Here](http://images.cocodataset.org/annotations/annotations_trainval2017.zip)
+
+Create a root folder called "coco" and unzip these two files into this folder. So the folder looks like:
+
+```
+coco/
+├── val2017/
+└── annotations/
+
+```
+To evaluate the model, run:
+```
+bash scripts/run_eval.sh
+```
+
+Please correctly set variables in this script including "COCO_ROOT", "CKPT_PATH", "MODEL", etc. The script will generate 5k images based on 5k unique given prompts from COCO val2017 dataset, and the FID and CLIP scores are calulated based on the generated images.
 ## License
 
 Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.

@@ -13,6 +13,12 @@
 # limitations under the License.
 
 import torch
+import os
+import re
+import shutil
+from accelerate.logging import get_logger
+
+logger = get_logger(__name__)
 
 def extract_into_tensor(a, t, x_shape):
     b, *_ = t.shape
@@ -57,5 +63,19 @@ def concat_dict(src_dict):
         elif isinstance(src_dict[k], dict):
             res_dict[k] = concat_dict(src_dict[k])
     return res_dict
+
+
+def keep_max_checkpoints(ckpt_dir, max_checkpoints_to_keep):
+    folders = [os.path.join(ckpt_dir, folder) for folder in os.listdir(ckpt_dir)]
+    if (len(folders) > max_checkpoints_to_keep):
+        def _inner(folder):
+            return list(map(int, re.findall(r"[\/]?([0-9]+)(?=[^\/]*$)", folder)))[0]
+
+        folders.sort(key=_inner)
+        logger.warning(
+            f"Deleting {len(folders) - max_checkpoints_to_keep} checkpoints to make room for new checkpoint."
+        )
+        for folder in folders[: len(folders) - max_checkpoints_to_keep]:
+            shutil.rmtree(folder)  
     
 

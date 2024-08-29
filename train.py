@@ -18,7 +18,6 @@ import os
 
 from core.network.build import (build_disc, 
                                 build_target_model,
-                                get_model_subfolder,
                                 build_pipeline)    
 import numpy as np
 import torch
@@ -32,7 +31,6 @@ from torch.utils.data import default_collate
 from tqdm.auto import tqdm
 
 from accelerate.utils import DistributedType
-from torch.distributed.fsdp import fully_sharded_data_parallel as FSDP
 
 import diffusers
 from diffusers import (
@@ -46,7 +44,8 @@ from core.optimizers import build_opt
 
 from core.utils import (predicted_origin, 
                         change_device,
-                        concat_dict)
+                        concat_dict,
+                        keep_max_checkpoints)
 
 
 logger = get_logger(__name__)
@@ -57,12 +56,12 @@ def set_fsdp_env():
     os.environ["FSDP_BACKWARD_PREFETCH"] = 'BACKWARD_PRE'
     os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = 'Transformer2DModel'
 
-def log_validation(model_state_dict, accelerator, scheduler, args):
+def log_validation(model_state_dict, accelerator, scheduler, timestep_list, args):
     logger.info('Running validation... ')
     torch.cuda.empty_cache()
 
     pipe = build_pipeline(args.base_model, model_state_dict, scheduler)
-    pipe.to('cuda')
+    pipe.to(accelerator.device)
 
     if args.seed is None:
         generator = None
@@ -82,8 +81,8 @@ def log_validation(model_state_dict, accelerator, scheduler, args):
     for i, prompt in enumerate(validation_prompts):
         images = []
         for _ in range(4):
-            image = pipe(prompt, num_inference_steps=1, 
-                        timesteps=[999], generator=generator,
+            image = pipe(prompt, num_inference_steps=args.num_ts, 
+                        timesteps=timestep_list, generator=generator,
                         guidance_scale=0).images[0]
             images.append(image)
 
@@ -104,7 +103,7 @@ def log_validation(model_state_dict, accelerator, scheduler, args):
         else:
             logger.warn(f'image logging not implemented for {tracker.name}')
 
-        return image_logs
+    return image_logs
 
 
 
@@ -137,6 +136,15 @@ def parse_args():
         default=500,
         help=(
             'Save checkpoints at every X updates'
+        ),
+    )
+
+    parser.add_argument(
+        '--max_checkpoints_to_keep',
+        type=int,
+        default=3,
+        help=(
+            'Beyond this, older checkpoints will be deleted to free space for new checkpoints.'
         ),
     )
 
@@ -248,15 +256,6 @@ def parse_args():
         choices=['summary.pkl', 'summary_llava.pkl', 'summary_noise_img_pair.pkl'],
         help=(
             'pkl file for loading data paths'
-        ),
-    )
-
-    parser.add_argument(
-        '--img_size',
-        type=int,
-        default=512,
-        help=(
-            'input image size'
         ),
     )
 
@@ -425,6 +424,9 @@ def main(args):
     disc.train()
     target_model.train()
 
+    # freeze discriminator backbone
+    disc.model.requires_grad_(False)
+
     # Also move the alpha and sigma noise schedules to accelerator.device.
     alpha_schedule = alpha_schedule.to(accelerator.device)
     sigma_schedule = sigma_schedule.to(accelerator.device)
@@ -447,12 +449,9 @@ def main(args):
 
     if args.gradient_checkpointing:
         target_model.enable_gradient_checkpointing()
-        disc.enable_gradient_checkpointing()
+        disc.model.enable_gradient_checkpointing()
 
     target_model, disc = accelerator.prepare(target_model, disc)
-
-    if args.resume_from_checkpoint:
-        accelerator.load_state(args.resume_from_checkpoint)
 
 
     opt_class, opt_kwargs = build_opt(args.optimizer)
@@ -493,6 +492,8 @@ def main(args):
         optimizer_G, optimizer_D, lr_scheduler
     )
 
+    if args.resume_from_checkpoint:
+        accelerator.load_state(args.resume_from_checkpoint)
 
     total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
 
@@ -502,11 +503,15 @@ def main(args):
     logger.info(f'  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}')
     logger.info(f'  Gradient Accumulation steps = {args.gradient_accumulation_steps}')
     logger.info(f'  Total optimization steps = {args.max_train_steps}')
+
     global_step = 0
+    if args.resume_from_checkpoint:
+        global_step = int(args.resume_from_checkpoint.split('-')[-1]) + 1
+        logger.info(f'Resuming from global step {global_step}')
 
     progress_bar = tqdm(
         range(0, args.max_train_steps),
-        initial=0,
+        initial=global_step,
         desc='Steps',
         disable=not accelerator.is_local_main_process,
     )
@@ -523,13 +528,12 @@ def main(args):
             D_ts_list.append(int(cur_ts_item))
     ts_D_choices = torch.tensor(D_ts_list, device=accelerator.device).long()
 
-    timestep_list = np.linspace(1000, 0, num=args.num_ts, endpoint=False) - 1
+    if args.num_ts == 1 and "PixArt" in args.base_model:
+        timestep_list = np.array([400.]) # Refer Appendix A.1 of https://arxiv.org/pdf/2403.04692
+    else:
+        timestep_list = np.linspace(1000, 0, num=args.num_ts, endpoint=False) - 1
     timestep_list = torch.tensor(timestep_list).long()
-    sqrt_alpha_prod_list = noise_scheduler.alphas_cumprod[timestep_list] ** 0.5
-    sqrt_one_minus_alpha_prod_list = (1 - noise_scheduler.alphas_cumprod[timestep_list]) ** 0.5
     timestep_list = timestep_list.to(accelerator.device)
-    sqrt_alpha_prod_list = sqrt_alpha_prod_list.to(accelerator.device)
-    sqrt_one_minus_alpha_prod_list = sqrt_one_minus_alpha_prod_list.to(accelerator.device)
 
     logger.info(f'timesteps for D: {ts_D_choices}')
     logger.info(f'timesteps for G: {timestep_list}')
@@ -542,10 +546,17 @@ def main(args):
             change_device(text_embs, accelerator.device)
 
             bsz = latents.shape[0]
+            added_cond_kwargs = {"resolution": None, "aspect_ratio": None}
 
             ts_indices = torch.randint(0, args.num_ts, (bsz, ))
             timesteps = timestep_list[ts_indices].long()
-            noisy_model_input = noise_scheduler.add_noise(latents, noises, timesteps)
+
+            if args.num_ts == 1 and "PixArt" in args.base_model:  # Refer Appendix A.1 of https://arxiv.org/pdf/2403.04692
+                timesteps_for_init_noise = torch.tensor([999.])[ts_indices].long()
+                noisy_model_input = noise_scheduler.add_noise(latents, noises, timesteps_for_init_noise)
+            else:
+                noisy_model_input = noise_scheduler.add_noise(latents, noises, timesteps)
+            
             
             if phase == 'G':
                 with accelerator.accumulate(target_model):
@@ -555,9 +566,13 @@ def main(args):
                     
                     noise_pred = target_model(
                         noisy_model_input,
-                        timesteps,
+                        timestep=timesteps,
+                        added_cond_kwargs=added_cond_kwargs,
                         **text_embs,
                     ).sample
+
+                    if "PixArt" in args.base_model:
+                        noise_pred = noise_pred.chunk(2, dim=1)[0]
 
                     pred_x_0 = predicted_origin(
                         noise_pred,
@@ -584,13 +599,19 @@ def main(args):
 
                     accelerator.backward(loss)
                     if accelerator.sync_gradients:
-                        #switch phase to D
-                        # accelerator.clip_grad_norm_(target_model.parameters(), args.max_grad_norm)
                         if accelerator.distributed_type == DistributedType.FSDP:
                             grad_norm = accelerator._models[0].clip_grad_norm_(args.max_grad_norm, 2)
                         else:
                             grad_norm = accelerator.clip_grad_norm_(target_model.parameters(), args.max_grad_norm)
+                        if torch.logical_or(grad_norm.isnan(), grad_norm.isinf()):
+                            optimizer_G.zero_grad(set_to_none=True)
+                            optimizer_D.zero_grad(set_to_none=True)
+                            logger.warning("NaN or Inf detected in grad_norm, skipping iteration...")
+                            continue
+
+                        #switch phase to D
                         phase = 'D'
+
                     optimizer_G.step()
                     lr_scheduler.step()
                     optimizer_G.zero_grad(set_to_none=True)
@@ -602,6 +623,7 @@ def main(args):
                 progress_bar.set_postfix(**logs)
                 accelerator.log(logs, step=global_step)
             
+
             elif phase == 'D':
                 with accelerator.accumulate(disc):
                     disc.train()
@@ -610,9 +632,13 @@ def main(args):
                     with torch.no_grad():
                         noise_pred = target_model(
                             noisy_model_input,
-                            timesteps,
+                            timestep=timesteps,
+                            added_cond_kwargs=added_cond_kwargs,
                             **text_embs,
                         ).sample
+
+                        if "PixArt" in args.base_model:
+                            noise_pred = noise_pred.chunk(2, dim=1)[0]
 
                         pred_x_0 = predicted_origin(
                             noise_pred,
@@ -641,8 +667,8 @@ def main(args):
                         
 
                     
-                    pred_fake = disc(noised_predicted_x0, timesteps_D_fake, **prompt_embeds_fake)
-                    pred_true = disc(noised_latents, timesteps_D_real, **text_embs)
+                    pred_fake = disc(noised_predicted_x0, timesteps_D_fake, added_cond_kwargs=added_cond_kwargs, **prompt_embeds_fake)
+                    pred_true = disc(noised_latents, timesteps_D_real, added_cond_kwargs=added_cond_kwargs, **text_embs)
                     
                     #calculate losses for fake and real data
                     loss_gen = F.binary_cross_entropy_with_logits(pred_fake, torch.zeros_like(pred_fake))
@@ -652,12 +678,17 @@ def main(args):
                     accelerator.backward(D_loss)
 
                     if accelerator.sync_gradients:
-                        #swith back to phase G and add global step by one.
-                        # accelerator.clip_grad_norm_(disc.parameters(), args.max_grad_norm)
                         if accelerator.distributed_type == DistributedType.FSDP:
                             grad_norm = accelerator._models[1].clip_grad_norm_(args.max_grad_norm, 2)
                         else:
-                            grad_norm = accelerator.clip_grad_norm_(target_model.parameters(), args.max_grad_norm)
+                            grad_norm = accelerator.clip_grad_norm_(disc.parameters(), args.max_grad_norm)
+                        if torch.logical_or(grad_norm.isnan(), grad_norm.isinf()):
+                            optimizer_G.zero_grad(set_to_none=True)
+                            optimizer_D.zero_grad(set_to_none=True)
+                            logger.warning("NaN or Inf detected in grad_norm, skipping iteration...")
+                            continue
+
+                        #switch back to phase G and add global step by one.
                         phase = 'G'
                         global_step += 1
                         progress_bar.update(1)
@@ -679,7 +710,9 @@ def main(args):
                     except Exception as e:
                         logger.info('error saving ckpts')
                         print(e)
-                    logger.info(f'Saved state to {save_path}')
+                    if accelerator.is_main_process:
+                        keep_max_checkpoints(ckpt_dir, args.max_checkpoints_to_keep)
+                        logger.info(f'Saved state to {save_path}')
 
                 
                 if global_step and global_step % args.validation_steps == 0 and phase == 'D':
@@ -688,8 +721,7 @@ def main(args):
                     else:
                         model_state_dict = accelerator.unwrap_model(target_model).state_dict()
                     if accelerator.is_main_process:
-                        log_validation(model_state_dict, 
-                                       accelerator, noise_scheduler, args)
+                        log_validation(model_state_dict, accelerator, noise_scheduler, list(timestep_list.cpu().numpy()), args)
                         torch.cuda.empty_cache()
                 accelerator.wait_for_everyone()
 

@@ -16,7 +16,8 @@
 import argparse, os
 import torch
 from diffusers import (DDPMScheduler,
-                       DiffusionPipeline)
+                       DiffusionPipeline,
+                       PixArtSigmaPipeline)
 import torch.nn as nn
 
 parser = argparse.ArgumentParser()
@@ -60,6 +61,14 @@ if args.model == 'sd21base':
     pipe_kwargs = {'num_inference_steps': 1,
                     'guidance_scale': 0,
                     'timesteps': [999]}
+elif args.model == 'pixart-sigma':
+    pipe = PixArtSigmaPipeline.from_pretrained('PixArt-alpha/PixArt-Sigma-XL-2-1024-MS')
+    transformer_state_dict = torch.load(args.ckpt_path)
+    pipe.transformer.load_state_dict(transformer_state_dict)
+    pipe_kwargs = {'num_inference_steps': 1,
+                'guidance_scale': 0,
+                'timesteps': [400]}
+
 else:
     raise Exception('wrong model, ', args.model)
 
@@ -72,13 +81,13 @@ with open(args.prompt_path, 'r') as f:
     for l in lines:
         prompt_list.append(l.strip().split('----')[1])
 
-torch.manual_seed(args.seed)
+generator = torch.manual_seed(args.seed)
 print('seed: ', args.seed)
 
 with torch.no_grad():
     num_samples = len(prompt_list)
     for id_ind, cur_caption in enumerate(prompt_list):
         outpath = os.path.join(args.out_folder, '%d.png'%id_ind)
-        image = pipe(prompt=cur_caption,
+        image = pipe(prompt=cur_caption, generator=generator,
                         **pipe_kwargs).images[0]
         image.save(outpath)

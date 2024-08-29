@@ -119,6 +119,9 @@ class Discriminator(nn.Module):
                                             ))
         self.heads = nn.ModuleList(self.heads)
 
+    @property
+    def model(self):
+        return self.unet
         
     def forward(self, latent, timesteps, encoder_hidden_states,
                 added_cond_kwargs: Optional[Dict[str, torch.Tensor]] = None):
@@ -134,9 +137,6 @@ class Discriminator(nn.Module):
         concat_res = torch.cat(res_list, dim=1)
         
         return concat_res
-
-    def enable_gradient_checkpointing(self):
-        self.unet.enable_gradient_checkpointing()
 
     def save_pretrained(self, path):
         torch.save(self.state_dict(), path)

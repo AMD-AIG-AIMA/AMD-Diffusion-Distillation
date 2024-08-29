@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# options: 'stabilityai/stable-diffusion-2-1-base', 'PixArt-alpha/PixArt-Sigma-XL-2-1024-MS'
 export MODEL_NAME='stabilityai/stable-diffusion-2-1-base'
 export PROJ_NAME='add_v21_base'
 export EXP_NAME='init_setting_bs384'
 export DATA_ROOT='../generated_data'
 
 
-accelerate launch --multi_gpu --mixed_precision fp16 --num_machines 1 --num_processes 8 --gpu_ids 0,1,2,3,4,5,6,7  train.py \
+accelerate launch --multi_gpu --mixed_precision bf16 --num_machines 1 --num_processes 8 --gpu_ids 0,1,2,3,4,5,6,7  train.py \
     --base_model=$MODEL_NAME \
-    --mixed_precision=fp16 \
+    --mixed_precision=bf16 \
     --G_lr=1e-6 \
     --D_lr=1e-6 \
     --max_train_steps=100000 \

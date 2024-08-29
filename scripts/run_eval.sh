@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+# options: 'sd21base', 'pixart-sigma'
 MODEL='sd21base'
 CKPT_PATH='ckpts/model.bin'
 OUT_FODLER='gen_images_sd21base'

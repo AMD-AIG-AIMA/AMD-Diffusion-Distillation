@@ -1,12 +1,19 @@
-# AMD-DD
-This repository provides training recipes for distillating diffusion models to few-step or one-step versions. 
+# AMD Diffusion Distillation
+This repository provides training recipes for our Nitro models, that are distilled from public diffusion models.
 
 For SDv2.1-base model, we achieve FLOP reduction of 95.95%, but only at the cost of 2.5% decreased CLIP score. The FID of the distilled model is even better than the full model, decreased by 14.23%.
 
 | Model    | FID &darr; | CLIP &uarr; |FLOPs| Latency on MI250 (sec)
 | :---: | :---: | :---: | :---: | :---:
 | SDv2.1-base 50 steps (cfg=7.5) | 25.47   | 0.3286 |83.04 | 4.94
-| Our distilled model 1 step | 26.04     | 0.3204|3.36 | 0.18
+| SDv2.1-base-Nitro 1 step | 26.04     | 0.3204|3.36 | 0.18
+
+For PixArt-Sigma model, our one-step PixArt-Sigma-Nitro achieves a 90.93% reduction in FLOPs at the cost of 3.7% lower CLIP score and 10.56% higher FID.
+
+| Model    | FID &darr; | CLIP &uarr; |FLOPs| Latency on MI250 (sec)
+| :---: | :---: | :---: | :---: | :---:
+| PixArt-Sigma 20 step | 34.14   | 0.3289 |187.96 | 7.46
+| PixArt-Sigma-Nitro 1 step | 37.75     | 0.3167|17.04 | 0.53
 
 ## Environment
 

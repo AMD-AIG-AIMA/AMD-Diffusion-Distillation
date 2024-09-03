@@ -19,6 +19,11 @@ def build_disc(basemodel, multiscale_D=False):
                     'stabilityai/stable-diffusion-xl-base-1.0']:
         from .unet_D import Discriminator
         return Discriminator(basemodel, multiscale_D)
+    
+    elif basemodel in ['PixArt-alpha/PixArt-Sigma-XL-2-1024-MS']:
+        from.transformer_D import Discriminator
+        return Discriminator(basemodel, multiscale_D)
+    
     else:
         raise Exception('undefined base model:', basemodel)
 
@@ -32,14 +37,17 @@ def build_target_model(basemodel, ckpt_path=None):
         model = UNet2DConditionModel.from_pretrained(
                 model_tag, subfolder='unet')
         return model
+    
+    elif basemodel in ['PixArt-alpha/PixArt-Sigma-XL-2-1024-MS']:
+        from diffusers import Transformer2DModel
+        model_tag = basemodel
+        if ckpt_path is not None:
+            model_tag = os.path.join(ckpt_path, 'transformer')
+        model = Transformer2DModel.from_pretrained(model_tag, subfolder='transformer')
+        return model
+    
     else:
         raise Exception('undefined base model:', basemodel)
-
-def get_model_subfolder(basemodel, save_path):
-    if basemodel in ['stabilityai/stable-diffusion-2-1-base',
-                    'stabilityai/stable-diffusion-xl-base-1.0']:
-        full_path = os.path.join(save_path, 'unet')
-        return full_path 
 
 def build_pipeline(basemodel, model_state_dict=None, scheduler=None):
     if basemodel in ['stabilityai/stable-diffusion-2-1-base',
@@ -53,6 +61,14 @@ def build_pipeline(basemodel, model_state_dict=None, scheduler=None):
                                     **kwargs)
         if model_state_dict is not None:
             pipe.unet.load_state_dict(model_state_dict)
+        return pipe
+    
+    elif basemodel in ['PixArt-alpha/PixArt-Sigma-XL-2-1024-MS']:
+        from diffusers import PixArtSigmaPipeline
+        kwargs = {}
+        pipe = PixArtSigmaPipeline.from_pretrained(basemodel, **kwargs)
+        if model_state_dict is not None:
+            pipe.transformer.load_state_dict(model_state_dict)
         return pipe
     
     else:

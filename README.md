@@ -2,14 +2,14 @@
 
 This repository provides training recipes for the AMD Nitro models, a series of efficient text-to-image generation models that are distilled from popular diffusion models on AMD Instinct GPUs.
 
-Compared to the [Stable Diffusion 2.1 base model](https://huggingface.co/stabilityai/stable-diffusion-2-1-base), we achieve 95.9% reduction in FLOPs at the cost of just 2.5% lower CLIP score and no degradation in FID score.
+Compared to the [Stable Diffusion 2.1 base model](https://huggingface.co/stabilityai/stable-diffusion-2-1-base), we achieve 95.9% reduction in FLOPs at the cost of just 2.5% lower CLIP score and 2.2% higher FID.
 
 | Model    | FID &darr; | CLIP &uarr; |FLOPs| Latency on AMD Instinct MI250 (sec)
 | :---: | :---: | :---: | :---: | :---:
 | Stable Diffusion 2.1 base, 50 steps (cfg=7.5) | 25.47   | 0.3286 |83.04 | 4.94
 | **Stable Diffusion 2.1 Nitro**, 1 step | 26.04     | 0.3204|3.36 | 0.18
 
-Compared to [PixArt-Sigma](https://pixart-alpha.github.io/PixArt-sigma-project/), our high resolution model achieves a 90.9% reduction in FLOPs at the cost of just 3.7% lower CLIP score and 10.56% higher FID.
+Compared to [PixArt-Sigma](https://pixart-alpha.github.io/PixArt-sigma-project/), our high resolution model achieves a 90.9% reduction in FLOPs at the cost of just 3.7% lower CLIP score and 10.5% higher FID.
 
 | Model    | FID &darr; | CLIP &uarr; |FLOPs| Latency on AMD Instinct MI250 (sec)
 | :---: | :---: | :---: | :---: | :---:

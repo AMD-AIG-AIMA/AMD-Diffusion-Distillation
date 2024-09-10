@@ -1,6 +1,10 @@
-# AMD Diffusion Distillation
+## AMD Nitro Diffusion 
+![combined_image_1x4](https://github.com/user-attachments/assets/4f55cfac-b24f-4963-bd74-7421db26ed56)
+
 
 This repository provides training recipes for the AMD Nitro models, a series of efficient text-to-image generation models that are distilled from popular diffusion models on AMD Instinct GPUs.
+
+⚡️ It contains an implementation of the core idea of [Latent Adversarial Diffusion Distillation](https://arxiv.org/abs/2403.12015), the method used to build the popular Stable Diffusion 3 Turbo model. Since the original authors didn't provide training code, we release our re-implementation to help advance further research in the field.
 
 Compared to the [Stable Diffusion 2.1 base model](https://huggingface.co/stabilityai/stable-diffusion-2-1-base), we achieve 95.9% reduction in FLOPs at the cost of just 2.5% lower CLIP score and 2.2% higher FID.
 
@@ -19,15 +23,17 @@ Compared to [PixArt-Sigma](https://pixart-alpha.github.io/PixArt-sigma-project/)
 
 ## Environment
 
+The codebase in implemented using PyTorch. Follow the [official instructions](https://pytorch.org/get-started/locally/) to install it in your compute environment.
+
 ### Docker image
-Pull the following docker image from [docker hub](https://hub.docker.com/r/rocm/pytorch)
+When running on AMD Instinct GPUs, the easiest way to start is using the docker images. Pull the following docker image from [docker hub](https://hub.docker.com/r/rocm/pytorch):
 
 ``` 
 docker pull rocm/pytorch:rocm6.1.3_ubuntu22.04_py3.10_pytorch_release-2.1.2 
 ```
 
 ### Dependencies
-Install the core python libraries by
+Install the core python libraries by:
 
 ```
 pip install diffusers==0.29.2 transformers accelerate wandb torchmetrics pycocotools torchmetrics[image] open-clip-torch

@@ -86,7 +86,7 @@ unet_state_dict = torch.load(ckpt_path)
 pipe.unet.load_state_dict(unet_state_dict)
 pipe = pipe.to("cuda")
 
-image = pipe(prompt='a photo of an astronaut riding a horse on mars',
+image = pipe(prompt='a photo of a cat',
              num_inference_steps=1,
              guidance_scale=0,
              timesteps=[999]).images[0]
@@ -96,15 +96,16 @@ image = pipe(prompt='a photo of an astronaut riding a horse on mars',
 ```python
 from diffusers import PixArtSigmaPipeline
 import torch
+from safetensors.torch import load_file
 
 pipe = PixArtSigmaPipeline.from_pretrained("PixArt-alpha/PixArt-Sigma-XL-2-1024-MS")
 
 ckpt_path = '<path to distilled checkpoint>'
-transformer_state_dict = torch.load(ckpt_path)
-pipe.transformer.load_state_dict(unet_state_dict)
+transformer_state_dict = load_file(ckpt_path)
+pipe.transformer.load_state_dict(transformer_state_dict)
 pipe = pipe.to("cuda")
 
-image = pipe(prompt='a photo of an astronaut riding a horse on mars',
+image = pipe(prompt='a photo of a cat',
              num_inference_steps=1,
              guidance_scale=0,
              timesteps=[400]).images[0]

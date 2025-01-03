@@ -14,7 +14,7 @@
 
 PROMPT_PATH='data/sample_prompts.txt'
 OUT_FOLDER='generated_data_pixart'
-MODEL_ID='PixArt-alpha/PixArt-XL-2-1024-MS'
+MODEL_ID='PixArt-alpha/PixArt-Sigma-XL-2-1024-MS'
 
 available_gpus=(0 1 2 3 4 5 6 7)
 for gpu in "${available_gpus[@]}"; do

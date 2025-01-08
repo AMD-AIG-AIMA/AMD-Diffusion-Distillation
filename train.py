@@ -588,7 +588,7 @@ def main(args):
                     noised_predicted_x0 = noise_scheduler.add_noise(pred_x_0, torch.randn_like(latents), timesteps_D)
                     
                     # adv loss
-                    pred_fake = disc(noised_predicted_x0, timesteps_D, **text_embs)
+                    pred_fake = disc(noised_predicted_x0, timesteps_D, added_cond_kwargs=added_cond_kwargs, **text_embs)
                     adv_loss = F.binary_cross_entropy_with_logits(pred_fake, torch.ones_like(pred_fake))
 
                     #recon loss

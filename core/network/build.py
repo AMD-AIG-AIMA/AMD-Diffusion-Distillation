@@ -21,8 +21,8 @@ def build_disc(basemodel, multiscale_D=False):
         return Discriminator(basemodel, multiscale_D)
     
     elif basemodel in ['PixArt-alpha/PixArt-Sigma-XL-2-1024-MS']:
-        from.transformer_D import Discriminator
-        return Discriminator(basemodel, multiscale_D)
+        from .transformer_D import Transformer2DDiscriminator
+        return Transformer2DDiscriminator(basemodel, multiscale_D)
     
     else:
         raise Exception('undefined base model:', basemodel)
@@ -39,11 +39,11 @@ def build_target_model(basemodel, ckpt_path=None):
         return model
     
     elif basemodel in ['PixArt-alpha/PixArt-Sigma-XL-2-1024-MS']:
-        from diffusers import Transformer2DModel
+        from diffusers import PixArtTransformer2DModel
         model_tag = basemodel
         if ckpt_path is not None:
             model_tag = os.path.join(ckpt_path, 'transformer')
-        model = Transformer2DModel.from_pretrained(model_tag, subfolder='transformer')
+        model = PixArtTransformer2DModel.from_pretrained(model_tag, subfolder='transformer')
         return model
     
     else:
@@ -72,4 +72,4 @@ def build_pipeline(basemodel, model_state_dict=None, scheduler=None):
         return pipe
     
     else:
-        raise Exception('undefined base model:', basemodel)
+        raise Exception('undefined base model:', basemodel)git 

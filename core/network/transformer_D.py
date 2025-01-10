@@ -1,5 +1,5 @@
 from typing import Callable
-from diffusers import Transformer2DModel
+from diffusers import PixArtTransformer2DModel
 import torch.nn as nn
 import torch
 from torch.nn.utils.spectral_norm import SpectralNorm
@@ -94,7 +94,7 @@ class DiscHead(nn.Module):
         return out
     
 
-# Adapted from https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/transformers/transformer_2d.py
+# Adapted from https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/transformers/pixart_transformer_2d.py
 # Modified to return intermediate features
 def transformer_forward(
         self,
@@ -105,14 +105,21 @@ def transformer_forward(
         added_cond_kwargs,
         block_hooks,
     ):
-        
         encoder_attention_mask = (1 - encoder_attention_mask.to(hidden_states.dtype)) * -10000.0
         encoder_attention_mask = encoder_attention_mask.unsqueeze(1)
 
         # 1. Input
-        hidden_states, encoder_hidden_states, timestep, embedded_timestep = self._operate_on_patched_inputs(
-            hidden_states, encoder_hidden_states, timestep, added_cond_kwargs
+        batch_size = hidden_states.shape[0]
+        hidden_states = self.pos_embed(hidden_states)
+        embedded_timestep = None
+
+        timestep, embedded_timestep = self.adaln_single(
+            timestep, added_cond_kwargs, batch_size=batch_size, hidden_dtype=hidden_states.dtype
         )
+
+        if self.caption_projection is not None:
+            encoder_hidden_states = self.caption_projection(encoder_hidden_states)
+            encoder_hidden_states = encoder_hidden_states.view(batch_size, -1, hidden_states.shape[-1])
 
         # 2. Blocks
         feat_list = []
@@ -132,7 +139,7 @@ def transformer_forward(
 class Transformer2DDiscriminator(nn.Module):
     def __init__(self, pretrained_path, is_multiscale=False):
         super().__init__()
-        self.transformer = Transformer2DModel.from_pretrained(pretrained_path, subfolder="transformer")
+        self.transformer = PixArtTransformer2DModel.from_pretrained(pretrained_path, subfolder="transformer")
         self.transformer.forward = transformer_forward
         self.block_hooks = set([2,8,14,20,27]) if is_multiscale else set([len(self.transformer.transformer_blocks) - 1])
 

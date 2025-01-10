@@ -54,7 +54,7 @@ def set_fsdp_env():
     os.environ["ACCELERATE_USE_FSDP"] = 'true'
     os.environ["FSDP_AUTO_WRAP_POLICY"] = 'TRANSFORMER_BASED_WRAP'
     os.environ["FSDP_BACKWARD_PREFETCH"] = 'BACKWARD_PRE'
-    os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = 'Transformer2DModel'
+    os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = 'PixArtTransformer2DModel'
 
 def log_validation(model_state_dict, accelerator, scheduler, timestep_list, args):
     logger.info('Running validation... ')

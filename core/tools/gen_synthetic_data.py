@@ -16,7 +16,7 @@ import os
 import random
 import datetime
 import torch
-from diffusers import DiffusionPipeline, DDIMScheduler, PixArtSigmaPipeline, Transformer2DModel
+from diffusers import DiffusionPipeline, DDIMScheduler, PixArtSigmaPipeline, PixArtTransformer2DModel
 import argparse
 
 parser = argparse.ArgumentParser(description='args for generating synthetic data')
@@ -192,7 +192,7 @@ elif args.base_model == 'stabilityai/stable-diffusion-xl-base-1.0':
 
 elif args.base_model in ['PixArt-alpha/PixArt-Sigma-XL-2-1024-MS',
                         'PixArt-alpha/PixArt-Sigma-XL-2-512-MS']:
-    transformer = Transformer2DModel.from_pretrained(
+    transformer = PixArtTransformer2DModel.from_pretrained(
     args.base_model, 
     subfolder='transformer', 
     use_safetensors=True,
